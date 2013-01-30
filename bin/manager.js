@@ -23,7 +23,7 @@ var connect = function(port) {
     sp.on('data', handleSignature);
     setTimeout(function() {
       sp.removeListener('data', handleSignature);
-    }, 1000);
+    }, 500);
   });
 
   // if the sp errors before opening just add it to the
@@ -36,7 +36,7 @@ var connect = function(port) {
   sp.on('close', removeSP);
 };
 
-function poll() {
+function poll(fn) {
   serialport.list(function(err, list) {
     ports = list;
 
@@ -46,47 +46,49 @@ function poll() {
       }
     });
 
+    fn && fn();
+
   });
 };
 
-poll();
+poll(function() {
+  net.createServer(function(conn) {
+    var buffer = '';
 
-net.createServer(function(conn) {
-  var buffer = '';
+    poll();
 
-  poll();
+    conn.once('close', function() {
+      clients = clients.filter(function(client) {
+        return client!==conn;
+      });
 
-  conn.once('close', function() {
-    clients = clients.filter(function(client) {
-      return client!==conn;
+      // automatically shut down when there
+      // are no clients interested in our
+      // services
+      !clients.length && process.exit();
     });
 
-    // automatically shut down when there
-    // are no clients interested in our
-    // services
-    !clients.length && process.exit();
-  });
+    // tell the client what sps are available
+    conn.write(JSON.stringify(ports.filter(function(p) {
+      return !!sps[p.comName];
+    })));
 
-  // tell the client what sps are available
-  conn.write(JSON.stringify(ports.filter(function(p) {
-    return !!sps[p.comName];
-  })));
+    // collect the comName from the client
+    conn.once('data', function request(d) {
 
-  // collect the comName from the client
-  conn.once('data', function request(d) {
+      buffer+=d.toString();
 
-    buffer+=d.toString();
+      if (buffer.indexOf('\n') > -1) {
+        var first = buffer.split('\n').shift();
 
-    if (buffer.indexOf('\n') > -1) {
-      var first = buffer.split('\n').shift();
-
-      if (sps[first]) {
-        sps[first].pipe(conn);
-        conn.setEncoding('ascii');
-        conn.pipe(sps[first]);
+        if (sps[first]) {
+          sps[first].pipe(conn);
+          conn.setEncoding('ascii');
+          conn.pipe(sps[first]);
+        }
+      } else {
+        conn.once('data', request);
       }
-    } else {
-      conn.once('data', request);
-    }
-  });
-}).listen(54321);
+    });
+  }).listen(54321);
+});

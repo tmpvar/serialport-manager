@@ -25,7 +25,7 @@ var connect = function(fn, options) {
       proc.unref();
       setTimeout(function() {
         connect(fn, options);
-      }, 500);
+      }, 1000);
 
     } else {
       fn(e);
