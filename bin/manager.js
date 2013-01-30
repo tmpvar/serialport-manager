@@ -2,15 +2,13 @@ var fs = require('fs'),
     serialport = require('serialport'),
     SerialPort = serialport.SerialPort,
     net = require('net'),
-    ports = {},
+    ports = {}, rawPorts = {},
     os = require('os');
 
 var connect = function(port) {
 
   var sp = new SerialPort(port.comName);
-  ports[port.comName] = {
-    ident : port
-  };
+  ports[port.comName] = port;
   ports[port.comName].sp = sp;
 
   sp.once('open', function() {
@@ -23,7 +21,7 @@ var connect = function(port) {
     sp.on('data', handleSignature);
     setTimeout(function() {
       sp.removeListener('data', handleSignature);
-      ports[port.comName].ident.signature = signature.replace(/^[\r\n]*|[\r\n]*$/g,'').split('\n');
+      ports[port.comName].signature = signature.replace(/^[\r\n]*|[\r\n]*$/g,'').split('\n');
     }, 2000);
   });
 
@@ -34,7 +32,6 @@ var connect = function(port) {
   });
 
   sp.on('close', function() {
-    console.log(port.comName, 'closed');
     delete ports[port.comName];
   });
 };
@@ -42,8 +39,7 @@ var connect = function(port) {
 
 setTimeout(function poll() {
   serialport.list(function(err, list) {
-
-    setTimeout(poll, 1000);
+    rawPorts = list;
 
     list.forEach(function(port) {
       if (!ports[port.comName]) {
@@ -62,12 +58,15 @@ setTimeout(function poll() {
         }
       }
     });
+
+    setTimeout(poll, 1000);
   });
 });
 
 net.createServer(function(conn) {
   var buffer = '';
-  conn.write(JSON.stringify(ports));
+
+  conn.write(JSON.stringify(rawPorts));
 
   conn.once('data', function request(d) {
 
