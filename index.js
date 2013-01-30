@@ -25,7 +25,7 @@ var connect = function(fn, options) {
       proc.unref();
       setTimeout(function() {
         connect(fn, options);
-      }, 100);
+      }, 500);
 
     } else {
       fn(e);
@@ -39,7 +39,6 @@ module.exports = function(fn, options) {
   connect(function handle(err, conn) {
     conn.pipe(process.stdout);
     conn.once('close', function() {
-      console.log('CLOSED\n\n\n\n')
       conn.destroy();
       if (options.reconnect) {
         connect(handle, options);
@@ -51,7 +50,6 @@ module.exports = function(fn, options) {
       deviceString+=d.toString();
 
       if (deviceString.indexOf('\n') > -1) {
-        console.log('CALLING FNn\n\n\n\n\n')
         fn(err, conn, JSON.parse(deviceString));
       } else {
         conn.once('data', catchDevice);

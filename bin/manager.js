@@ -2,81 +2,88 @@ var fs = require('fs'),
     serialport = require('serialport'),
     SerialPort = serialport.SerialPort,
     net = require('net'),
-    ports = {}, rawPorts = {},
-    os = require('os');
+    ports, sps = {},
+    os = require('os'),
+    clients = [];
 
 var connect = function(port) {
 
   var sp = new SerialPort(port.comName);
-  ports[port.comName] = port;
-  ports[port.comName].sp = sp;
+  sp.writable = true;
+  sp.end = sp.end || function() {};
+  sps[port.comName] = sp;
 
   sp.once('open', function() {
-    var signature = '';
+    port.signature = '';
 
     var handleSignature = function(data) {
-      signature += data.toString();
+      port.signature += data.toString();
     }
 
     sp.on('data', handleSignature);
     setTimeout(function() {
       sp.removeListener('data', handleSignature);
-      ports[port.comName].signature = signature.replace(/^[\r\n]*|[\r\n]*$/g,'').split('\n');
-    }, 2000);
+    }, 1000);
   });
 
   // if the sp errors before opening just add it to the
   // known ports list.  Ignore it from now on.
-  sp.once('error', function() {
-    delete ports[port.comName];
-  });
+  var removeSP = function() {
+    sps[port.comName] = false;
+  };
 
-  sp.on('close', function() {
-    delete ports[port.comName];
-  });
+  sp.once('error', removeSP);
+  sp.on('close', removeSP);
 };
 
-
-setTimeout(function poll() {
+function poll() {
   serialport.list(function(err, list) {
-    rawPorts = list;
+    ports = list;
 
     list.forEach(function(port) {
-      if (!ports[port.comName]) {
-        if (os.platform().toLowerCase().indexOf('win') < 0) {
-          // Unix only
-          fs.stat(port.comName, function(err, stat) {
-            // ignore ports that do not exist on the filesystem
-            if (err) {
-              ports[port.comName] = true;
-            } else {
-              connect(port);
-            }
-          });
-        } else {
-          connect(port);
-        }
+      if (!sps[port.comName] && sps[port.comName] !== false) {
+        connect(port);
       }
     });
 
-    setTimeout(poll, 1000);
   });
-});
+};
+
+poll();
 
 net.createServer(function(conn) {
   var buffer = '';
 
-  conn.write(JSON.stringify(rawPorts));
+  poll();
 
+  conn.once('close', function() {
+    clients = clients.filter(function(client) {
+      return client!==conn;
+    });
+
+    // automatically shut down when there
+    // are no clients interested in our
+    // services
+    !clients.length && process.exit();
+  });
+
+  // tell the client what sps are available
+  conn.write(JSON.stringify(ports.filter(function(p) {
+    return !!sps[p.comName];
+  })));
+
+  // collect the comName from the client
   conn.once('data', function request(d) {
 
     buffer+=d.toString();
 
     if (buffer.indexOf('\n') > -1) {
       var first = buffer.split('\n').shift();
-      if (ports[first]) {
-        ports[first].sp.pipe(conn);
-        conn.pipe(ports[first].sp);
+
+      if (sps[first]) {
+        sps[first].pipe(conn);
+        conn.setEncoding('ascii');
+        conn.pipe(sps[first]);
       }
     } else {
       conn.once('data', request);
