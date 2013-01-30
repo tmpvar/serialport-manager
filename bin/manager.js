@@ -118,6 +118,7 @@ net.createServer(function(conn) {
         var first = buffer.split('\n').shift();
 
         if (sps[first]) {
+          sps[first].setMaxListeners(clients.length*5);
           sps[first].pipe(conn);
           conn.pipe(sps[first]);
         } else {

@@ -22,13 +22,15 @@ var connect = function(fn, options) {
       proc.unref();
       connect(fn, options);
     } else {
-      fn(e);
+      fn(err);
     }
   });
 };
 
 module.exports = function(fn, options) {
-  options = options || {};
+  options = options || {
+    reconnect : true
+  };
 
   connect(function handle(err, conn) {
 
