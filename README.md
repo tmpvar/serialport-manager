@@ -29,8 +29,12 @@ calling `spm` above performs the following actions:
 * on connection, wait for the device list
 * parse the json device list
 * call the function passed into `spm`
-* identify what device you want to use by sending back the commName
+* identify what device you want to use by sending back the `commName`
 * bind to data events or pipe somewhere
+
+## Why?
+
+I want plug and play serial devices. I also want them to be accessible by more than one program.
 
 ## License
 
