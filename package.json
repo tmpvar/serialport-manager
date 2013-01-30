@@ -1,6 +1,6 @@
 {
   "name": "serialport-manager",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "single process manager of transient serialport connections",
   "main": "index.js",
   "scripts": {
