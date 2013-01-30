@@ -1,6 +1,6 @@
 {
   "name": "serialport-manager",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "single process manager of transient serialport connections",
   "main": "index.js",
   "scripts": {
@@ -21,6 +21,7 @@
   "license": "MIT",
   "readmeFilename": "README.md",
   "dependencies": {
-    "serialport": "git://github.com/voodootikigod/node-serialport.git"
+    "serialport": "git://github.com/voodootikigod/node-serialport.git",
+    "async": "~0.1.22"
   }
 }

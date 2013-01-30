@@ -8,10 +8,7 @@ var connect = function(fn, options) {
     port : 54321,
   }, function() {
     fn(null, client);
-    client.resume();
   });
-
-  client.pause();
 
   client.on('error', function(err) {
 
@@ -23,10 +20,7 @@ var connect = function(fn, options) {
       });
 
       proc.unref();
-      setTimeout(function() {
-        connect(fn, options);
-      }, 1000);
-
+      connect(fn, options);
     } else {
       fn(e);
     }
@@ -37,7 +31,7 @@ module.exports = function(fn, options) {
   options = options || {};
 
   connect(function handle(err, conn) {
-    conn.pipe(process.stdout);
+
     conn.once('close', function() {
       conn.destroy();
       if (options.reconnect) {

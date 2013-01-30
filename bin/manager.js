@@ -3,12 +3,18 @@ var fs = require('fs'),
     SerialPort = serialport.SerialPort,
     net = require('net'),
     ports, sps = {},
+    async = require('async'),
     os = require('os'),
     clients = [];
 
-var connect = function(port) {
+var connect = function(port, fn) {
+
+  if (sps[port.comName] || sps[port.comName] === false) {
+    return fn();
+  }
 
   var sp = new SerialPort(port.comName);
+
   sp.writable = true;
   sp.end = sp.end || function() {};
   sps[port.comName] = sp;
@@ -16,20 +22,25 @@ var connect = function(port) {
   sp.once('open', function() {
     port.signature = '';
 
+    var signatureTimeout = null, lastData = 0;
     var handleSignature = function(data) {
+      clearTimeout(signatureTimeout);
+      signatureTimeout = setTimeout(function() {
+        sp.removeListener('data', handleSignature);
+        fn && fn();
+      }, 100);
+
       port.signature += data.toString();
-    }
+    };
 
     sp.on('data', handleSignature);
-    setTimeout(function() {
-      sp.removeListener('data', handleSignature);
-    }, 500);
   });
 
   // if the sp errors before opening just add it to the
   // known ports list.  Ignore it from now on.
   var removeSP = function() {
     sps[port.comName] = false;
+    fn && fn();
   };
 
   sp.once('error', removeSP);
@@ -39,39 +50,33 @@ var connect = function(port) {
 function poll(fn) {
   serialport.list(function(err, list) {
     ports = list;
-
-    list.forEach(function(port) {
-      if (!sps[port.comName] && sps[port.comName] !== false) {
-        connect(port);
-      }
+    async.forEach(list, connect, function() {
+      fn && fn();
     });
-
-    fn && fn();
-
   });
 };
 
-poll(function() {
-  net.createServer(function(conn) {
-    var buffer = '';
+net.createServer(function(conn) {
+  var buffer = '';
 
-    poll();
-
-    conn.once('close', function() {
-      clients = clients.filter(function(client) {
-        return client!==conn;
-      });
-
-      // automatically shut down when there
-      // are no clients interested in our
-      // services
-      !clients.length && process.exit();
+  conn.once('close', function() {
+    clients = clients.filter(function(client) {
+      return client!==conn;
     });
+
+    // automatically shut down when there
+    // are no clients interested in our
+    // services
+    !clients.length && process.exit();
+  });
+
+
+  poll(function() {
 
     // tell the client what sps are available
     conn.write(JSON.stringify(ports.filter(function(p) {
       return !!sps[p.comName];
-    })));
+    })) + '\n');
 
     // collect the comName from the client
     conn.once('data', function request(d) {
@@ -90,5 +95,5 @@ poll(function() {
         conn.once('data', request);
       }
     });
-  }).listen(54321);
-});
+  });
+}).listen(54321);
