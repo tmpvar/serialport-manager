@@ -2,7 +2,7 @@ var fs = require('fs'),
     serialport = require('serialport'),
     SerialPort = serialport.SerialPort,
     net = require('net'),
-    ports, sps = {},
+    ports = [], sps = {},
     async = require('async'),
     os = require('os'),
     clients = [];
@@ -13,10 +13,16 @@ var connect = function(port, fn) {
     return fn();
   }
 
+  ports.push(port);
+
   var sp = new SerialPort(port.comName);
 
   sp.writable = true;
-  sp.end = sp.end || function() {};
+  sp.end = sp.end || function() {
+    sp.close();
+    sp.emit('end');
+  };
+
   sps[port.comName] = sp;
 
   sp.once('open', function() {
@@ -26,9 +32,10 @@ var connect = function(port, fn) {
     var handleSignature = function(data) {
       clearTimeout(signatureTimeout);
       signatureTimeout = setTimeout(function() {
+        port.signature = port.signature.trim();
         sp.removeListener('data', handleSignature);
         fn && fn();
-      }, 100);
+      }, 50);
 
       port.signature += data.toString();
     };
@@ -39,25 +46,49 @@ var connect = function(port, fn) {
   // if the sp errors before opening just add it to the
   // known ports list.  Ignore it from now on.
   var removeSP = function() {
-    sps[port.comName] = false;
+    ports = ports.filter(function(p) {
+      if (sps[port.comName])
+      return p.comName !== port.comName;
+    });
     fn && fn();
   };
 
-  sp.once('error', removeSP);
-  sp.on('close', removeSP);
+  sp.once('error', function() {
+    removeSP();
+    sps[port.comName] = false;
+  });
+
+  sp.on('close', function() {
+    removeSP()
+    delete sps[port.comName];
+  });
 };
 
+var pollQueue = [];
 function poll(fn) {
+  pollQueue.push(fn);
+
+  if (pollQueue.length > 1) {
+    return;
+  }
+
   serialport.list(function(err, list) {
-    ports = list;
     async.forEach(list, connect, function() {
-      fn && fn();
+
+      while(pollQueue.length > 0) {
+        var cb = pollQueue.shift();
+        typeof cb === 'function' && cb();
+      }
     });
   });
 };
 
+poll();
+
 net.createServer(function(conn) {
   var buffer = '';
+
+  clients.push(conn);
 
   conn.once('close', function() {
     clients = clients.filter(function(client) {
@@ -88,8 +119,9 @@ net.createServer(function(conn) {
 
         if (sps[first]) {
           sps[first].pipe(conn);
-          conn.setEncoding('ascii');
           conn.pipe(sps[first]);
+        } else {
+          conn.destroy();
         }
       } else {
         conn.once('data', request);
