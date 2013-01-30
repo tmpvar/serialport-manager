@@ -19,3 +19,20 @@ spm(function(err, connection, deviceList) {
 
 ```
 
+### How does it work
+
+calling `spm` above performs the following actions:
+
+* attempt connection to the serialport manager daemon
+ * if the connection fails, spawn the daemon
+  * reconnect
+* on connection, wait for the device list
+* parse the json device list
+* call the function passed into `spm`
+* identify what device you want to use by sending back the commName
+* bind to data events or pipe somewhere
+
+## License
+
+MIT
+
