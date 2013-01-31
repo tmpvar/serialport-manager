@@ -50,7 +50,7 @@ module.exports = function(fn, options) {
       deviceString+=d.toString();
 
       if (deviceString.indexOf('\n') > -1) {
-        fn(err, conn, JSON.parse(deviceString));
+        fn && fn(err, conn, JSON.parse(deviceString));
       } else {
         conn.once('data', catchDevice);
       }
