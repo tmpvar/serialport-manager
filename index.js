@@ -34,6 +34,10 @@ module.exports = function(fn, options) {
 
   connect(function handle(err, conn) {
 
+    if (err) {
+      return;
+    }
+
     conn.once('close', function() {
       conn.destroy();
       if (options.reconnect) {
