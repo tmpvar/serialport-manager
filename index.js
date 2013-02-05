@@ -3,7 +3,8 @@ var sproc = require('sproc'),
     path = require('path'),
     split = require('split'),
     EventEmitter = require('events').EventEmitter,
-    net = require('net');
+    net = require('net'),
+    log;
 
 function Device(host, info) {
   this.host = host;
@@ -12,17 +13,19 @@ function Device(host, info) {
 }
 
 Device.prototype.connect = function(fn) {
-  console.log('creating connection to', this.host, this.port);
+  log && log('creating connection to', this.host, this.port);
   var client = net.createConnection({
     host: this.host,
     port: this.port
   });
 
   client.on('connect', function() {
+    log && log('connected to', this.host, this.port);
     fn(null, client);
   });
 
   client.on('error', function(e) {
+    log && log('error', e);
     fn(e);
   });
 };
@@ -34,12 +37,16 @@ module.exports = function(options, fn) {
     options = {};
   }
 
-  sproc(defaults(options, {
+  defaults(options, {
     host: 'localhost',
     port: 4672,
     script: path.join(__dirname, 'daemon', 'main.js'),
-    log: console.log
-  }), function(err, stream) {
+    log: null
+  });
+
+  log = options.log;
+
+  sproc(options, function(err, stream) {
 
     if (err) {
       return fn(err);
