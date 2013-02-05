@@ -1,5 +1,4 @@
 var sproc = require('sproc'),
-    dnode = require('dnode')
     defaults = require('defaults'),
     path = require('path'),
     split = require('split'),
