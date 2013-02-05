@@ -4,7 +4,7 @@
   "description": "single process manager of transient serialport connections",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tap ./test"
   },
   "repository": {
     "type": "git",

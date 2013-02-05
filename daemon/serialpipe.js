@@ -1,39 +1,40 @@
 var net = require('net'),
-    findPort = require('netutil').findFreePort,
-    servers = {};
+    serialport = require('./serialport'),
+    store = require('./store'),
+    findPort = require('netutil').findFreePort;
 
-module.exports = function(device, registry, fn) {
+module.exports = function(info, fn) {
+  store.set(info.serialNumber, false);
 
-  if (!servers[device.serialNumber]) {
-    findPort(5000, 65000, 'localhost', function(err, port) {
-      var server = net.createServer(function(conn) {
+  serialport(info.comName, function(e, sp, signature) {
+    if (e) {
+      store.remove(info.serialNumber);
+      return fn();
+    }
 
-        servers[device.serialNumber].clients++;
-        conn.on('close', function() {
-          servers[device.serialNumber].clients--;
-        });
+    info.signature = signature;
 
-        registry.get(device.serialNumber, function(e, sp) {
-          if (e) {
-            server.close();
-            return;
-          }
-
-          conn.write('ready\n');
-
-          sp.pipe(conn).pipe(sp, { end : false });
-        });
-      });
-
-      servers[device.serialNumber] = { clients: 0 };
-
-      server.on('close', function() {
-        servers[device.serialNumber] = false;
-      });
-
-      server.listen(port, function(e) {
-        fn(e, { port: port });
-      });
+    var server = net.createServer(function(conn) {
+      conn.pipe(sp, { end : false }).pipe(conn);
     });
-  }
+
+    sp.once('close', function() {
+      console.log('REMOVE', info.serialNumber);
+      store.remove(info.serialNumber);
+      server.close();
+    });
+
+    findPort(5000, 65000, 'localhost', function(err, port) {
+      if (err) {
+        return fn(err);
+      }
+
+      info.port = port;
+      console.log('ADD', info.serialNumber);
+      store.set(info.serialNumber, info);
+      fn();
+      server.listen(port, fn);
+    });
+
+  });
 };
