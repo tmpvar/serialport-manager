@@ -1,6 +1,6 @@
 {
   "name": "serialport-manager",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "single process manager of transient serialport connections",
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "url": "git://github.com/tmpvar/serialport-manager.git"
   },
   "bin": {
-    "serialport-manager": "bin/manager.js"
+    "serialport-daemon": "bin/daemon.js"
   },
   "keywords": [
     "serialport",
