@@ -2,7 +2,7 @@ var spm = require('../');
 
 spm(function(err, manager) {
   manager.on('device', function(device) {
-
+console.log('found a device!', device)
     device.connect(function(err, stream) {
 
       stream.on('data', function(d) {
@@ -14,10 +14,6 @@ spm(function(err, manager) {
         stream.write('G1 X10\n');
         stream.write('G1 X0\n');
       }, 2000);
-
-      setInterval(function() {
-        stream.write('?');
-      }, 100);
 
       stream.on('end', function() {
         clearInterval(timer);

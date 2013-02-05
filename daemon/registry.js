@@ -1,17 +1,38 @@
 var SerialPort = require('serialport').SerialPort,
     serialpipe = require('./serialpipe'),
     signature = require('./signature'),
+    defaults = require('defaults'),
     ee = module.exports = new (require('events').EventEmitter)();
     registry = {};
 
 
-module.exports.get = function(serialNumber, fn) {
+var get = module.exports.get = function(serialNumber, fn) {
+console.log((new Error()).stack);
   if (registry[serialNumber]) {
     if (registry[serialNumber].sp) {
       fn(null, registry[serialNumber].sp);
     } else {
-      console.log('no serialport connection :(')
-      // TODO: go get the sp if available
+      var sp = registry[serialNumber].sp = new SerialPort(registry[serialNumber].info.comName);
+      sp.writable = true;
+
+      sp.on('close', function() {
+        registry[serialNumber].sp = false;
+      });
+
+      var open = false;
+      sp.on('open', function() {
+        open = true;
+        fn(null, registry[serialNumber].sp);
+      });
+
+      sp.on('error', function(e) {
+        if (open || registry[serialNumber].info.signature) {
+          registry[serialNumber].sp = false;
+          fn();
+        } else {
+          fn(e);
+        }
+      });
     }
   } else {
     fn(new Error('not found'));
@@ -23,7 +44,7 @@ module.exports.save = function(fn) {
   fn();
 };
 
-module.exports.register = function(info) {
+module.exports.register = function(info, fn) {
   var now = Date.now();
 
   var serialNumber = info.serialNumber;
@@ -32,30 +53,42 @@ module.exports.register = function(info) {
     registry[serialNumber] = {
       info : info
     };
+  } else {
+    registry[serialNumber].info.comName = info.comName;
   }
 
   if (!registry[serialNumber].sp) {
-    var sp = registry[serialNumber].sp = new SerialPort(info.comName);
-    sp.writable = true;
+    console.log('create sp for', registry[serialNumber].info.comName);
 
-    if (!registry[serialNumber].info.signature) {
+    get(serialNumber, function(e, sp) {
 
-      signature(sp, function(e, sig) {
-        if (e) {
-          sp.close();
-          return;
-        }
+      if (e) {
+        return fn(e);
+      }
+      //if (!registry[serialNumber].info.signature) {
 
-        registry[serialNumber].info.signature = sig;
+        signature(sp, function(e, sig) {
+          fn(e);
 
-        serialpipe(registry[serialNumber].info, module.exports, function(e, serverInfo) {
-          console.log(serverInfo)
-          registry[serialNumber].port = serverInfo.port;
-          ee.emit('device', registry[serialNumber]);
+          registry[serialNumber].info.signature = sig;
+
+          serialpipe(registry[serialNumber].info, module.exports, function(e, serverInfo) {
+            registry[serialNumber].port = serverInfo.port;
+            ee.emit('device', registry[serialNumber]);
+          });
         });
 
-      });
-    }
+      // reconnection
+      // } else {
+      //   console.log('reconnect')
+      //   serialpipe(registry[serialNumber].info, module.exports, function(e, serverInfo) {
+      //     registry[serialNumber].port = serverInfo.port;
+      //     ee.emit('device', registry[serialNumber]);
+      //   });
+      // }
+    });
+  } else {
+    fn();
   }
 };
 
