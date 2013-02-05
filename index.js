@@ -1,60 +1,63 @@
-var child = require('child_process'),
-    net = require('net'),
-    path = require('path');
+var sproc = require('sproc'),
+    dnode = require('dnode')
+    defaults = require('defaults'),
+    path = require('path'),
+    split = require('split'),
+    EventEmitter = require('events').EventEmitter,
+    net = require('net');
 
-var connect = function(fn, options) {
+function Device(host, info) {
+  this.host = host;
+  this.port = info.port;
+  this.info = info.info;
+}
+
+Device.prototype.connect = function(fn) {
   var client = net.createConnection({
-    host : options.host || 'localhost',
-    port : 54321,
-  }, function() {
-    fn(null, client);
+    host: this.host,
+    port: this.port
   });
 
-  client.on('error', function(err) {
-
-    // daemon is not running
-    if (err.code && err.code === 'ECONNREFUSED') {
-      var proc = child.spawn('node', [path.join(__dirname, 'bin', 'manager.js')], {
-        stdio: 'pipe',
-        detached: true
-      });
-
-      proc.unref();
-      connect(fn, options);
+  var s = '';
+  client.once('data', function handshake(d) {
+    s += d.toString();
+    console.log('s', s)
+    if (s.indexOf('ready\n') > -1) {
+      fn(null, client);
     } else {
-      fn(err);
+      client.once('data', handshake);
     }
+  });
+
+  client.on('error', function(e) {
+    fn(e);
   });
 };
 
-module.exports = function(fn, options) {
-  options = options || {
-    reconnect : true
-  };
 
-  connect(function handle(err, conn) {
+module.exports = function(options, fn) {
+  if (!fn && typeof options === 'function') {
+    fn = options;
+    options = {};
+  }
+
+  sproc(defaults(options, {
+    host: 'localhost',
+    port: 4672,
+    script: path.join(__dirname, 'daemon', 'main.js'),
+    log: console.log,
+    keepProcessReference: true
+  }), function(err, stream) {
 
     if (err) {
-      return;
+      return fn(err);
     }
 
-    conn.once('close', function() {
-      conn.destroy();
-      if (options.reconnect) {
-        connect(handle, options);
-      }
+    var ee = new EventEmitter();
+    stream.pipe(split()).on('data', function(d) {
+      ee.emit('device', new Device(options.host, JSON.parse(d)));
     });
 
-    var deviceString = ''
-    conn.once('data', function catchDevice(d) {
-      deviceString+=d.toString();
-
-      if (deviceString.indexOf('\n') > -1) {
-        fn && fn(err, conn, JSON.parse(deviceString));
-      } else {
-        conn.once('data', catchDevice);
-      }
-    });
-
-  }, options);
+    fn(null, ee);
+  });
 };

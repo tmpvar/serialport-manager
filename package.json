@@ -22,6 +22,11 @@
   "readmeFilename": "README.md",
   "dependencies": {
     "serialport": "git://github.com/voodootikigod/node-serialport.git",
-    "async": "~0.1.22"
+    "async": "~0.1.22",
+    "netutil": "0.0.1",
+    "dnode": "~1.0.2",
+    "defaults": "~1.0.0",
+    "sproc": "~0.1.0",
+    "split": "~0.1.2"
   }
 }
