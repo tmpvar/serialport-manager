@@ -25,10 +25,7 @@ module.exports = function(device, registry, fn) {
         });
       });
 
-      servers[device.serialNumber] = {
-        clients: 0,
-        port: port
-      };
+      servers[device.serialNumber] = { clients: 0 };
 
       server.on('close', function() {
         servers[device.serialNumber] = false;
@@ -38,7 +35,5 @@ module.exports = function(device, registry, fn) {
         fn(e, { port: port });
       });
     });
-  } else {
-    fn(null, { port: servers[device.serialNumber].port });
   }
 };

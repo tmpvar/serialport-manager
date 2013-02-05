@@ -1,4 +1,5 @@
-var poll = require('./poll').interval(1000),
+var dnode = require('dnode'),
+    poll = require('./poll').interval(1000),
     fs = require('fs'),
     log = require('./log'),
     registry = require('./registry'),

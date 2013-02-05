@@ -2,8 +2,7 @@ var EventEmitter = require('events').EventEmitter,
     serialport = require('serialport'),
     registry = require('./registry'),
     poller = module.exports,
-    async = require('async'),
-    interval = 2000;
+    interval = 1000;
 
 poller.interval = function(ms) {
   interval = ms;
@@ -12,9 +11,9 @@ poller.interval = function(ms) {
 
 poller.timer = setTimeout(function poll() {
   serialport.list(function(err, ports) {
-    async.forEach(ports, registry.register, function() {
-      console.log('poll complete')
-      poller.timer = setTimeout(poll, interval)
+    ports.forEach(function(port) {
+      registry.register(port);
     });
+    poller.timer = setTimeout(poll, poller.interval)
   });
 }, interval);
