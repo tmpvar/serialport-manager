@@ -14,6 +14,11 @@ poller.interval = function(ms) {
 poller.timer = setTimeout(function poll() {
   serialport.list(function(err, ports) {
     async.forEach(ports, function(port, fn) {
+
+      if (!port.serialNumber) {
+        port.serialNumber = port.pnpId;
+      }
+
       if (!store.has(port.serialNumber)) {
         if (process.platform !== 'win32') {
           // Ensure the thing we're trying to connect to
