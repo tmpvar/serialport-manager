@@ -24,7 +24,7 @@ var signature = function(sp, fn) {
 
 
 module.exports = function(comName, fn) {
-  var sp = new SerialPort(comName);
+  var sp = new SerialPort(comName, {}, false);
   sp.writable = true;
 
   var open = false;
